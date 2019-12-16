@@ -1,5 +1,7 @@
 ﻿using DnsClient;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Resilience;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,13 +14,15 @@ namespace User.Identity.Services
 {
     public class UserService : IUserService
     {
-        private HttpClient _httpClient;
+        private IHttpClient _httpClient;
         //private readonly string _userServiceUrl = "http://localhost:5000";
         private string _userServiceUrl;
+        private ILogger<UserService> _logger;
 
-        public UserService(HttpClient httpClient, IOptions<ServiceDiscoveryOptions> serviceDiscoveryOptions,IDnsQuery dnsQuery)
+        public UserService(IHttpClient httpClient, IOptions<ServiceDiscoveryOptions> serviceDiscoveryOptions,IDnsQuery dnsQuery,ILogger<UserService> logger)
         {
             _httpClient = httpClient;
+            _logger = logger;
 
             //服务发现通过IDnsQuery完成
             //通过consul服务发现获取UserAPI地址
@@ -33,17 +37,27 @@ namespace User.Identity.Services
         {
             var form = new Dictionary<string, string> { { "phone", phone } };
 
-            var content = new FormUrlEncodedContent(form);
-            HttpResponseMessage response = await _httpClient.PostAsync(_userServiceUrl+ "/api/users/check-or-create",content);
-
-
-            if (response.StatusCode==HttpStatusCode.OK)
+             
+            try
             {
-                var userId = await response.Content.ReadAsStringAsync();
-                int.TryParse(userId,out int intUserId);
+                //var content = new FormUrlEncodedContent(form);
+                HttpResponseMessage response = await _httpClient.PostAsync(_userServiceUrl + "/api/users/check-or-create", form);
+                if (response.StatusCode == HttpStatusCode.OK)
+                {
+                    var userId = await response.Content.ReadAsStringAsync();
+                    int.TryParse(userId, out int intUserId);
 
-                return intUserId;
+                    return intUserId;
+                }
             }
+            catch (Exception ex)
+            {
+                _logger.LogError("CheckOrCreate重试后失败"+ex.Message+ex.StackTrace);
+                throw ex;
+            }
+
+
+            
 
             return 0;
         }

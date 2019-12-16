@@ -8,7 +8,7 @@ using User.API.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.JsonPatch;
-
+using System.Net.Http;
 
 namespace User.API.Controllers
 {
@@ -45,6 +45,7 @@ namespace User.API.Controllers
                 //return NotFound();
                 throw new UserOperationException($"错误的用户上下文Id {UserIdentity.UserId}");
             }
+            
             return Json(user);
         }
 
@@ -120,8 +121,9 @@ namespace User.API.Controllers
                 _userContext.Users.Add(user);
                 await _userContext.SaveChangesAsync();
             }
-           
 
+            //测试Polly用
+            //throw new HttpRequestException("222222");
             return Ok(user.Id);
         }
     }
